@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BUP CSE Notice & Course Board</title>
+<!-- Firebase (Realtime Database) — powers the shared, cross-device board.
+     Fill in FIREBASE_CONFIG near the top of the <script> below with your
+     own project's config before deploying. See the setup steps the person
+     helping you set this up should have shared with you. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --bg: #F3F2EE;
+    --surface: #FFFFFF;
+    --ink: #22262E;
+    --ink-muted: #6B6E76;
+    --green: #1E5C46;
+    --green-dark: #123328;
+    --navy: #1F3B70;
+    --skyblue: #4A90C4;
+    --maroon: #B33025;
+    --gold: #C9962F;
+    --border: #DEDBD2;
+    --cat-general: #5B6B8C;
+    --cat-exam: #1F3B70;
+    --cat-event: #2F7D55;
+    --cat-holiday: #C9962F;
+    --cat-deadline: #B33025;
+    --type-theory: #1F3B70;
+    --type-lab: #4A90C4;
+    --type-project: #B33025;
+    --mat-handnote: #C9962F;
+    --mat-pdf: #1F3B70;
+    --mat-slides: #4A90C4;
+    --mat-other: #6B6E76;
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: linear-gradient(135deg, #EDF5EE 0%, #F4F2ED 55%, #F1F0E9 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; }
+  a { color: var(--navy); }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 270px; flex-shrink: 0;
+    background: linear-gradient(165deg, var(--green) 0%, var(--green-dark) 100%);
+    color: #EDEEF2;
+    padding: 26px 20px; display: flex; flex-direction: column; gap: 20px;
+  }
+  .brand { display: flex; gap: 12px; align-items: flex-start; }
+  .crest {
+    flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
+    border: 1.5px solid var(--gold);
+    background: conic-gradient(var(--maroon) 0deg 120deg, var(--navy) 120deg 240deg, var(--skyblue) 240deg 360deg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-serif); font-size: 12.5px; font-weight: bold;
+    color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); position: relative;
+  }
+  .crest::after { content: ''; position: absolute; inset: 4px; border: 1px solid rgba(255,255,255,0.5); border-radius: 50%; }
+  .brand-text h1 { font-family: var(--font-serif); font-size: 18px; margin: 0 0 2px; line-height: 1.25; }
+  .brand-text .dept { font-size: 12px; color: #C9D6CC; margin: 0 0 4px; }
+  .brand-text .motto { font-size: 11px; font-style: italic; color: var(--gold); margin: 0; }
+
+  .rule { height: 1px; background: linear-gradient(to right, var(--gold), var(--maroon) 55%, var(--navy)); opacity: 0.75; }
+
+  .semester-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
+  .semester-item {
+    display: flex; align-items: baseline; gap: 10px; padding: 10px 10px;
+    border-radius: 3px; background: transparent; border: none; color: #D7DAE3;
+    text-align: left; font-size: 14px;
+  }
+  .semester-item:hover { background: rgba(255,255,255,0.06); }
+  .semester-item.active { background: rgba(255,255,255,0.12); color: #fff; }
+  .semester-item .idx { font-family: var(--font-serif); font-size: 12px; color: #8D93A6; min-width: 20px; }
+  .semester-item.active .idx { color: var(--gold); }
+  .semester-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .semester-item .count { font-size: 11px; color: #8D93A6; }
+
+  .add-semester { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 16px; }
+  .add-semester input {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+    color: #fff; padding: 9px 10px; border-radius: 3px; font-size: 13px;
+  }
+  .add-semester input::placeholder { color: #9FA5B5; }
+  .add-semester button { background: var(--gold); color: var(--green-dark); border: none; padding: 9px 10px; border-radius: 3px; font-size: 13px; font-weight: 600; }
+  .add-semester button:hover { background: #B3852A; }
+
+  .admin-panel { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .admin-status { font-size: 12px; color: #C9D6CC; display: flex; align-items: center; gap: 6px; }
+  .admin-status .dot { width: 6px; height: 6px; border-radius: 50%; background: #8D93A6; flex-shrink: 0; }
+  .admin-status.on .dot { background: var(--gold); }
+  .admin-panel .link-btn {
+    background: transparent; border: none; color: var(--gold); font-size: 12.5px; padding: 0; text-align: left; text-decoration: underline;
+  }
+  .admin-panel .link-btn:hover { color: #E0B65A; }
+  .admin-actions-row { display: flex; gap: 10px; }
+  .admin-form { display: flex; flex-direction: column; gap: 6px; }
+  .admin-form input {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+    color: #fff; padding: 8px 10px; border-radius: 3px; font-size: 13px;
+  }
+  .admin-form input::placeholder { color: #9FA5B5; }
+  .admin-form-actions { display: flex; gap: 8px; }
+  .admin-form-actions button[type="submit"] {
+    background: var(--gold); color: var(--green-dark); border: none; padding: 7px 12px; border-radius: 3px; font-size: 12.5px; font-weight: 600;
+  }
+  .admin-form-actions button[type="button"] {
+    background: transparent; border: 1px solid rgba(255,255,255,0.25); color: #D7DAE3; padding: 7px 12px; border-radius: 3px; font-size: 12.5px;
+  }
+  .admin-error { font-size: 11.5px; color: #E38B7F; }
+  .admin-note { font-size: 11.5px; color: #E38B7F; }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; padding: 32px 44px 60px; max-width: 940px; }
+  .main-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 6px; gap: 16px; flex-wrap: wrap; }
+  .main-header .idx-label { font-family: var(--font-serif); color: var(--maroon); font-size: 13px; display: block; margin-bottom: 2px; }
+  .main-header h2 { font-family: var(--font-serif); font-size: 27px; margin: 0; }
+  .header-actions { display: flex; gap: 8px; }
+  .header-actions button { background: transparent; border: 1px solid var(--border); color: var(--ink-muted); padding: 7px 12px; border-radius: 3px; font-size: 12.5px; }
+  .header-actions button:hover { border-color: var(--ink-muted); color: var(--ink); }
+  .header-actions button.danger:hover { border-color: var(--maroon); color: var(--maroon); }
+
+  .tabs { display: flex; gap: 4px; margin: 16px 0 18px; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: transparent; border: none; padding: 9px 4px; margin-right: 22px;
+    font-size: 14px; color: var(--ink-muted); border-bottom: 2px solid transparent; position: relative; top: 1px;
+  }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--maroon); font-weight: 600; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .toolbar input[type="text"], .toolbar select {
+    background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; border-radius: 3px; font-size: 13.5px; color: var(--ink);
+  }
+  .toolbar input[type="text"] { flex: 1; min-width: 160px; }
+  .btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 16px; border-radius: 3px; font-size: 13.5px; }
+  .btn-primary:hover { background: var(--green-dark); }
+
+  .credit-summary { font-size: 12.5px; color: var(--ink-muted); margin: -8px 0 16px; }
+
+  /* ---------- Forms ---------- */
+  .panel-form {
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green);
+    padding: 18px 20px; border-radius: 3px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .panel-form.hidden { display: none; }
+  .panel-form h3 { font-family: var(--font-serif); font-size: 17px; margin: 0 0 2px; }
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .form-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+  .form-field label { font-size: 12px; color: var(--ink-muted); }
+  .form-field input, .form-field select, .form-field textarea {
+    border: 1px solid var(--border); padding: 8px 10px; border-radius: 3px; font-size: 14px; color: var(--ink); background: #FCFBF9;
+  }
+  .form-field textarea { resize: vertical; min-height: 60px; }
+  .form-hint { font-size: 11.5px; color: #99978C; margin-top: -6px; }
+  .form-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-muted); }
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .form-actions button.cancel { background: transparent; border: 1px solid var(--border); padding: 8px 16px; border-radius: 3px; color: var(--ink-muted); }
+  .form-actions button.save { background: var(--green); border: none; padding: 8px 16px; border-radius: 3px; color: #fff; }
+  .form-actions button.save:hover { background: var(--green-dark); }
+
+  /* ---------- Notice cards ---------- */
+  .notice-list, .course-list { display: flex; flex-direction: column; gap: 10px; }
+  .notice-card {
+    background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--cat-general);
+    border-radius: 3px; padding: 14px 18px; display: flex; justify-content: space-between; gap: 16px;
+  }
+  .notice-card.cat-Exam { border-left-color: var(--cat-exam); }
+  .notice-card.cat-Event { border-left-color: var(--cat-event); }
+  .notice-card.cat-Holiday { border-left-color: var(--cat-holiday); }
+  .notice-card.cat-Deadline { border-left-color: var(--cat-deadline); }
+
+  .notice-main { flex: 1; min-width: 0; }
+  .notice-meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .tag-sm { font-size: 11.5px; color: var(--ink-muted); }
+  .pinned-tag { font-size: 11px; color: var(--maroon); border: 1px solid var(--maroon); padding: 1px 6px; border-radius: 2px; }
+  .elective-tag { font-size: 11px; color: var(--gold); border: 1px solid var(--gold); padding: 1px 6px; border-radius: 2px; }
+  .notice-title { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .notice-desc { font-size: 13.5px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 6px; white-space: pre-wrap; }
+  .notice-dates { font-size: 12px; color: #99978C; }
+
+  /* ---------- Course cards ---------- */
+  .course-block { display: flex; flex-direction: column; gap: 0; }
+  .course-card {
+    background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--type-theory);
+    border-radius: 3px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  }
+  .course-card.expanded { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .course-card.type-Lab { border-left-color: var(--type-lab); }
+  .course-card.type-Project { border-left-color: var(--type-project); }
+  .course-main { flex: 1; min-width: 0; }
+  .course-code { font-family: var(--font-serif); font-size: 12.5px; color: var(--ink-muted); }
+  .course-title { font-size: 15px; font-weight: 600; margin: 3px 0 4px; }
+  .course-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .type-tag { font-size: 11px; color: #fff; padding: 1px 8px; border-radius: 2px; background: var(--type-theory); }
+  .type-tag.Lab { background: var(--type-lab); }
+  .type-tag.Project { background: var(--type-project); }
+  .credit-tag { font-size: 11.5px; color: var(--ink-muted); }
+
+  .row-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+  .row-actions button { background: transparent; border: 1px solid var(--border); color: var(--ink-muted); padding: 5px 10px; border-radius: 3px; font-size: 12.5px; white-space: nowrap; }
+  .row-actions button:hover { border-color: var(--ink-muted); color: var(--ink); }
+  .row-actions button.materials-btn.active { border-color: var(--navy); color: var(--navy); }
+  .confirm-row { display: flex; gap: 6px; }
+  .confirm-row .yes { border-color: var(--maroon); color: var(--maroon); }
+
+  /* ---------- Materials (CT / Mid / Final) ---------- */
+  .materials-panel {
+    background: #FBFAF7; border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 3px 3px; padding: 16px 18px 18px;
+  }
+  .stage-section + .stage-section { margin-top: 16px; }
+  .stage-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .stage-header h4 { font-family: var(--font-serif); font-size: 14.5px; margin: 0; color: var(--navy); }
+  .stage-header button {
+    background: transparent; border: 1px solid var(--border); color: var(--ink-muted);
+    padding: 3px 10px; border-radius: 3px; font-size: 12px;
+  }
+  .stage-header button:hover { border-color: var(--navy); color: var(--navy); }
+  .material-list { display: flex; flex-direction: column; gap: 6px; }
+  .material-item {
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--mat-other);
+    border-radius: 3px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .material-item.type-Handwritten { border-left-color: var(--mat-handnote); }
+  .material-item.type-PDF { border-left-color: var(--mat-pdf); }
+  .material-item.type-Slides { border-left-color: var(--mat-slides); }
+  .material-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+  .material-title { font-size: 13.5px; font-weight: 600; }
+  .material-type-tag { font-size: 10.5px; color: #fff; padding: 1px 7px; border-radius: 2px; background: var(--mat-other); flex-shrink: 0; }
+  .material-type-tag.Handwritten { background: var(--mat-handnote); }
+  .material-type-tag.PDF { background: var(--mat-pdf); }
+  .material-type-tag.Slides { background: var(--mat-slides); }
+  .material-link { font-size: 12px; white-space: nowrap; }
+  .material-notes { font-size: 12px; color: var(--ink-muted); flex-basis: 100%; margin-top: 2px; }
+  .material-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .material-actions button {
+    background: transparent; border: 1px solid var(--border); color: var(--ink-muted);
+    padding: 3px 9px; border-radius: 3px; font-size: 11.5px;
+  }
+  .material-actions button:hover { border-color: var(--ink-muted); color: var(--ink); }
+  .material-actions .yes { border-color: var(--maroon); color: var(--maroon); }
+  .stage-empty { font-size: 12.5px; color: #99978C; padding: 4px 0; }
+
+  .empty-state { border: 1px dashed var(--border); border-radius: 3px; padding: 36px 20px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+  .empty-state.hidden { display: none; }
+  .empty-state strong { color: var(--ink); display: block; margin-bottom: 6px; font-family: var(--font-serif); font-size: 18px; }
+
+  .status-line { font-size: 12.5px; color: var(--ink-muted); padding: 40px 0; text-align: center; }
+  .caveat { font-size: 11.5px; color: #99978C; margin-top: 18px; line-height: 1.5; }
+
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar { width: auto; flex-direction: row; align-items: center; padding: 14px; gap: 10px; flex-wrap: wrap; }
+    .brand-text .dept, .brand-text .motto { display: none; }
+    .rule { display: none; }
+    .semester-list { flex-direction: row; overflow-x: auto; flex: 1 1 100%; order: 3; }
+    .add-semester { flex-direction: row; border-top: none; padding-top: 0; order: 2; }
+    .add-semester input { width: 130px; }
+    .main { padding: 20px 16px 40px; }
+    .material-item { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="appRoot">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="crest">BUP</div>
+      <div class="brand-text">
+        <h1>CSE Notice &amp; Course Board</h1>
+        <p class="dept">Dept. of Computer Science &amp; Engineering</p>
+        <p class="motto">Excellence through knowledge</p>
+      </div>
+    </div>
+    <div class="rule"></div>
+    <div class="semester-list" id="semesterList"></div>
+    <div class="admin-panel" id="adminPanel"></div>
+    <form class="add-semester" id="addSemesterForm">
+      <input type="text" id="newSemesterInput" placeholder="e.g. 9th Semester" maxlength="60" />
+      <button type="submit">Add semester</button>
+    </form>
+  </aside>
+
+  <main class="main">
+    <div id="statusLine" class="status-line">Loading your board…</div>
+
+    <div id="mainContent" style="display:none;">
+      <div class="main-header">
+        <div>
+          <span class="idx-label" id="semIndexLabel">01</span>
+          <h2 id="semTitle">Semester</h2>
+        </div>
+        <div class="header-actions" id="headerActions">
+          <button id="renameSemBtn">Rename</button>
+          <button id="deleteSemBtn" class="danger">Delete semester</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tabNotices" data-tab="notices">Notices</button>
+        <button class="tab-btn" id="tabCourses" data-tab="courses">Courses</button>
+      </div>
+
+      <!-- NOTICES PANEL -->
+      <div id="noticesPanel">
+        <div class="toolbar">
+          <input type="text" id="searchInput" placeholder="Search this semester's notices…" />
+          <select id="categoryFilter">
+            <option value="">All categories</option>
+            <option value="General">General</option>
+            <option value="Exam">Exam</option>
+            <option value="Event">Event</option>
+            <option value="Holiday">Holiday</option>
+            <option value="Deadline">Deadline</option>
+          </select>
+          <button class="btn-primary" id="newNoticeBtn">+ New notice</button>
+        </div>
+
+        <form class="panel-form hidden" id="noticeForm">
+          <h3 id="noticeFormTitle">New notice</h3>
+          <div class="form-row">
+            <div class="form-field" style="flex:2;">
+              <label for="fTitle">Title</label>
+              <input type="text" id="fTitle" maxlength="120" required />
+            </div>
+            <div class="form-field">
+              <label for="fCategory">Category</label>
+              <select id="fCategory">
+                <option>General</option><option>Exam</option><option>Event</option><option>Holiday</option><option>Deadline</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="fDate">Notice date</label>
+              <input type="date" id="fDate" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="fDesc">Details</label>
+            <textarea id="fDesc" maxlength="1000" placeholder="What students or staff need to know…"></textarea>
+          </div>
+          <label class="form-check"><input type="checkbox" id="fPinned" /> Pin to top of this semester's board</label>
+          <div class="form-actions">
+            <button type="button" class="cancel" id="cancelNoticeBtn">Cancel</button>
+            <button type="submit" class="save">Save notice</button>
+          </div>
+        </form>
+
+        <div class="notice-list" id="noticeList"></div>
+        <div class="empty-state hidden" id="noticeEmptyState">
+          <strong>No notices yet</strong>
+          Add the first notice for this semester using "+ New notice" above.
+        </div>
+      </div>
+
+      <!-- COURSES PANEL -->
+      <div id="coursesPanel" style="display:none;">
+        <div class="credit-summary" id="creditSummary"></div>
+        <div class="toolbar">
+          <input type="text" id="courseSearchInput" placeholder="Search code or title…" />
+          <select id="typeFilter">
+            <option value="">All types</option>
+            <option value="Theory">Theory</option>
+            <option value="Lab">Lab</option>
+            <option value="Project">Project / Thesis</option>
+          </select>
+          <button class="btn-primary" id="newCourseBtn">+ Add course</button>
+        </div>
+
+        <form class="panel-form hidden" id="courseForm">
+          <h3 id="courseFormTitle">New course</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cCode">Course code</label>
+              <input type="text" id="cCode" maxlength="30" placeholder="e.g. CSE2205" required />
+            </div>
+            <div class="form-field" style="flex:2;">
+              <label for="cTitle">Course title</label>
+              <input type="text" id="cTitle" maxlength="120" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cType">Type</label>
+              <select id="cType"><option>Theory</option><option>Lab</option><option>Project</option></select>
+            </div>
+            <div class="form-field">
+              <label for="cCredit">Credit hours</label>
+              <input type="number" id="cCredit" min="0" max="6" step="0.5" value="3" />
+            </div>
+          </div>
+          <label class="form-check"><input type="checkbox" id="cElective" /> Elective / optional course</label>
+          <div class="form-actions">
+            <button type="button" class="cancel" id="cancelCourseBtn">Cancel</button>
+            <button type="submit" class="save">Save course</button>
+          </div>
+        </form>
+
+        <div class="course-list" id="courseList"></div>
+        <div class="empty-state hidden" id="courseEmptyState">
+          <strong>No courses listed</strong>
+          Add courses for this semester using "+ Add course" above.
+        </div>
+        <p class="caveat">Course lists follow BUP's published CSE curriculum outline; credit values are typical estimates. Confirm against your own registration slip, and edit anything that's changed for your batch. Materials store titles, notes and links only — this board can't host actual PDF or image files, so paste a Drive/OneDrive link where relevant. This board is shared: everyone who visits this site can view the same notices, courses and materials, once Firebase is configured (see the banner above if it isn't yet). Only signed-in admins can add, edit, or delete anything — that's enforced by real Firebase Authentication and by the database's security rules, not just by this page's UI. Admin accounts are created in the Firebase console (Authentication tab), not from this page, so a stranger can't grant themselves edit access.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'bup-cse-board-data';
+  let data = null;
+  let activeTab = 'notices';
+  let editingNoticeId = null;
+  let editingCourseId = null;
+  let confirmingDeleteNoticeId = null;
+  let confirmingDeleteCourseId = null;
+  let confirmingSemesterDelete = false;
+
+  let expandedCourseId = null;
+  let editingMaterialId = null;
+  let materialFormStage = 'CT';
+  let confirmingDeleteMaterialId = null;
+
+  let isAdmin = false;
+  let currentAdminName = null;
+  let showAdminLogin = false;
+  let adminLoginError = '';
+  let resetSentMsg = '';
+
+  const STAGES = [
+    { key: 'CT', label: 'Class Tests (CT)' },
+    { key: 'Mid', label: 'Mid Semester' },
+    { key: 'Final', label: 'Semester Final' }
+  ];
+  const MATERIAL_TYPES = ['Handwritten', 'PDF', 'Slides', 'Other'];
+
+  const el = (id) => document.getElementById(id);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+  // ---------- BUP CSE curriculum seed ----------
+  function course(code, title, type, credit, elective){
+    return { id: uid(), code, title, type, credit, elective: !!elective };
+  }
+
+  const CURRICULUM = [
+    { name: '1st Semester', courses: [
+      course('CHEM1103','Fundamentals of Chemistry','Theory',3),
+      course('CHEM1104','Chemistry Laboratory','Lab',1),
+      course('ICE1105(CSE)','Electrical Circuits Analysis','Theory',3),
+      course('ICE1106(CSE)','Electrical Circuits Analysis Laboratory','Lab',1),
+      course('GEBS1107','Bangladesh Studies','Theory',3),
+      course('MATH1109','Differential and Integral Calculus','Theory',3),
+      course('PHY1111','Waves and Oscillations, Optics & Modern Physics','Theory',3),
+      course('PHY1112','Physics Laboratory','Lab',1),
+      course('ENG1102(CSE)','Communicative English-I','Theory',3)
+    ]},
+    { name: '2nd Semester', courses: [
+      course('CSE1203','Structured Programming Language','Theory',3),
+      course('LANG1211','Foreign Language (French)','Theory',3),
+      course('MATH1209','Linear Algebra','Theory',3),
+      course('MATH1207','Discrete Mathematics','Theory',3),
+      course('ICE1206(CSE)','Electronic Devices and Circuits Laboratory','Lab',1),
+      course('ICE1205(CSE)','Electronic Devices and Circuits','Theory',3),
+      course('CSE1204','Structured Programming Language Laboratory','Lab',1),
+      course('CSE1202','Digital Logic Design Laboratory','Lab',1),
+      course('CSE1201','Digital Logic Design','Theory',3)
+    ]},
+    { name: '3rd Semester', courses: [
+      course('CSE2103','Object Oriented Programming Language','Theory',3),
+      course('MATH2111','Differential Equations, Laplace Transform and Fourier Transform','Theory',3),
+      course('ENG2110(CSE)','Presentation Skill Development','Theory',3),
+      course('ICE2108(CSE)','Electrical Drives and Instrumentation Laboratory','Lab',1),
+      course('ICE2107(CSE)','Electrical Drives and Instrumentation','Theory',3),
+      course('CSE2104','Object Oriented Programming Language Laboratory-I','Lab',1),
+      course('CSE2101','Data Structures and Algorithms-I','Theory',3),
+      course('CSE2102','Data Structures and Algorithms-I Laboratory','Lab',1),
+      course('CSE2105','Theory of Computation','Theory',3)
+    ]},
+    { name: '4th Semester', courses: [
+      course('CSE2208','Object Oriented Programming Laboratory-II','Lab',1),
+      course('MATH2211(CSE)','Statistics','Theory',3),
+      course('ICE2210(CSE)','Digital Electronics and Pulse Technique Laboratory','Lab',1),
+      course('ICE2209(CSE)','Digital Electronics and Pulse Technique','Theory',3),
+      course('GEEM2207','Engineering Ethics and Moral Philosophy','Theory',3),
+      course('CSE2206','Data Structures and Algorithms-II Laboratory','Lab',1),
+      course('CSE2205','Data Structures and Algorithms-II','Theory',3),
+      course('CSE2203','Computer Architecture','Theory',3),
+      course('CSE2202','Engineering Drawing and CAD Laboratory','Lab',1)
+    ]},
+    { name: '5th Semester', courses: [
+      course('CSE3110','Data Communication Laboratory','Lab',1),
+      course('CSE3102','Database Management Systems Laboratory','Lab',1),
+      course('CSE3109','Data Communication','Theory',3),
+      course('CSE3108','Operating System Laboratory','Lab',1),
+      course('CSE3107','Operating System','Theory',3),
+      course('CSE3105','Microprocessors, Micro-controllers and Assembly Language','Theory',3),
+      course('CSE3104','Compiler Laboratory','Lab',1),
+      course('CSE3103','Compiler','Theory',3),
+      course('CSE3101','Database Management Systems','Theory',3),
+      course('CSE3106','Microprocessors, Micro-controllers and Assembly Language Laboratory','Lab',1)
+    ]},
+    { name: '6th Semester', courses: [
+      course('CSE3206','Software Engineering Laboratory','Lab',1),
+      course('GEESL3211(CSE)','Environment, Sustainability and Law','Theory',3),
+      course('CSE3200','Industrial Training','Project',2),
+      course('GERM3209','Fundamentals of Research Methodology','Theory',3),
+      course('CSE3208','Software Development Project – I','Project',1),
+      course('CSE3205','Software Engineering','Theory',3),
+      course('CSE3204','Digital System Design Laboratory','Lab',1),
+      course('CSE3203','Digital System Design','Theory',3),
+      course('CSE3202','Computer Network Laboratory','Lab',1),
+      course('CSE3201','Computer Network','Theory',3)
+    ]},
+    { name: '7th Semester', courses: [
+      course('CSE4101','Computer Interfacing','Theory',3),
+      course('CSE4105','Mathematical Analysis for Computer Science','Theory',3),
+      course('CSE4133','Telecommunication Engineering','Theory',3,true),
+      course('CSE4129','Basic Multimedia Theory','Theory',3,true),
+      course('CSE4119','Advanced Algorithms','Theory',3,true),
+      course('CSE4117','Blockchain and Crypto currency','Theory',3,true),
+      course('CSE4104','Software Development Project-II','Project',1),
+      course('CSE4109','Artificial Neural Networks and Fuzzy Systems','Theory',3,true),
+      course('CSE4107','Digital Image Processing','Theory',3,true),
+      course('CSE4102','Computer Interfacing Laboratory','Lab',1),
+      course('CSE4100','Final Year - Thesis/Project','Project',3)
+    ]},
+    { name: '8th Semester', courses: [
+      course('GEPM4205(CSE)','ICT Project Management and Finance','Theory',3),
+      course('CSE4200','Final Year - Thesis/Project','Project',3),
+      course('CSE4201','Artificial Intelligence','Theory',3),
+      course('CSE4202','Artificial Intelligence Laboratory','Lab',1),
+      course('CSE4209','Mobile and Ubiquitous Computing','Theory',3,true),
+      course('CSE4210','Mobile and Ubiquitous Computing Laboratory','Lab',1,true),
+      course('CSE4217','Machine Learning','Theory',3,true),
+      course('CSE4218','Machine Learning Laboratory','Lab',1,true)
+    ]}
+  ];
+
+  function defaultData(){
+    const semesters = [];
+    const notices = {};
+    const courses = {};
+    let fourthId = null;
+    CURRICULUM.forEach((sem, i) => {
+      const id = uid();
+      if (i === 3) fourthId = id;
+      semesters.push({ id, name: sem.name, createdAt: Date.now() + i });
+      notices[id] = [];
+      courses[id] = sem.courses;
+    });
+    notices[fourthId].push({
+      id: uid(),
+      title: 'Welcome to your 4th Semester board',
+      description: 'This board is preloaded with the BUP CSE curriculum for all 8 semesters. Open a course and hit "Materials" to file handwritten notes, PDFs or slide links under CT, Mid, or Semester Final.',
+      category: 'General', date: new Date().toISOString().slice(0,10), pinned: true, createdAt: Date.now()
+    });
+    return {
+      semesters, activeSemesterId: fourthId, notices, courses, materials: {}
+    };
+  }
+
+  // ---------- Shared database (Firebase Realtime Database) ----------
+  // Replace these placeholder values with your own Firebase project's config
+  // (Firebase Console → Project settings → Your apps → Web app → SDK setup).
+  // These values are meant to be public/client-side — Firebase's Realtime
+  // Database security rules (set separately, in the Firebase console) are
+  // what actually control who can read/write, not secrecy of this object.
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCGYPcKuLoFQFJHuatSm5dGdCK17IFSMHc",
+    authDomain: "bcse-manager.firebaseapp.com",
+    databaseURL: "https://bcse-manager-default-rtdb.firebaseio.com",
+    projectId: "bcse-manager"
+  };
+
+  // Everyone who loads this page reads the same record in your Firebase
+  // database, so the board stays in sync and visible to every classmate.
+  // Only signed-in admin accounts (created in the Firebase console) can
+  // write changes — enforced by the database's security rules, not just by
+  // this page's UI. Until you fill in FIREBASE_CONFIG above, the app falls
+  // back to this browser's own localStorage in a single-user local mode.
+  let dbRef = null;
+  let authRef = null;
+  let authReady = false;
+
+  if (typeof firebase !== 'undefined' && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY') {
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      dbRef = firebase.database().ref(STORAGE_KEY);
+      authRef = firebase.auth();
+      authRef.onAuthStateChanged((user) => {
+        isAdmin = !!user;
+        currentAdminName = user ? user.email : null;
+        authReady = true;
+        if (data) renderAll();
+      });
+    } catch (e) {
+      console.error('Firebase init failed', e);
+      dbRef = null;
+      authRef = null;
+    }
+  }
+
+  async function loadData(){
+    try {
+      if (dbRef) {
+        const snap = await dbRef.once('value');
+        data = snap.exists() ? JSON.parse(snap.val()) : null;
+      } else {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        data = raw ? JSON.parse(raw) : null;
+      }
+      if (data) {
+        if (!data.courses) data.courses = {};
+        if (!data.materials) data.materials = {};
+        delete data.admins;
+        delete data.adminPasscode;
+        data.semesters.forEach(s => { if (!data.courses[s.id]) data.courses[s.id] = []; });
+      } else {
+        data = defaultData();
+        await persist();
+      }
+    } catch (e) {
+      console.error('Load error', e);
+      data = defaultData();
+      try { await persist(); } catch(e2) { console.error('Could not save initial data', e2); }
+    }
+  }
+
+  async function persist(){
+    try {
+      const json = JSON.stringify(data);
+      if (dbRef) {
+        await dbRef.set(json);
+      } else {
+        localStorage.setItem(STORAGE_KEY, json);
+      }
+    } catch (e) {
+      console.error('Storage error', e);
+      el('statusLine').textContent = 'Could not save — your changes may not persist.';
+      el('statusLine').style.display = 'block';
+      setTimeout(() => { el('statusLine').style.display = 'none'; }, 3000);
+    }
+  }
+
+  function activeSemester(){ return data.semesters.find(s => s.id === data.activeSemesterId); }
+  function noticesFor(semId){ if (!data.notices[semId]) data.notices[semId] = []; return data.notices[semId]; }
+  function coursesFor(semId){ if (!data.courses[semId]) data.courses[semId] = []; return data.courses[semId]; }
+  function materialsFor(courseId){ if (!data.materials[courseId]) data.materials[courseId] = []; return data.materials[courseId]; }
+
+  // ---------- Sidebar / header ----------
+  function renderSemesterList(){
+    const list = el('semesterList');
+    list.innerHTML = '';
+    data.semesters.forEach((s, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'semester-item' + (s.id === data.activeSemesterId ? ' active' : '');
+      const nCount = (data.notices[s.id] || []).length;
+      btn.innerHTML = `<span class="idx">${String(i+1).padStart(2,'0')}</span><span class="name"></span><span class="count">${nCount}</span>`;
+      btn.querySelector('.name').textContent = s.name;
+      btn.addEventListener('click', () => {
+        data.activeSemesterId = s.id;
+        editingNoticeId = null; editingCourseId = null;
+        confirmingDeleteNoticeId = null; confirmingDeleteCourseId = null;
+        expandedCourseId = null; editingMaterialId = null; confirmingDeleteMaterialId = null;
+        renderAll();
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  function renderHeader(){
+    const sem = activeSemester();
+    const idx = data.semesters.findIndex(s => s.id === sem.id);
+    el('semIndexLabel').textContent = String(idx+1).padStart(2,'0');
+    el('semTitle').textContent = sem.name;
+  }
+
+  function renderDeleteSemesterButton(){
+    el('deleteSemBtn').textContent = confirmingSemesterDelete ? 'Click again to confirm' : 'Delete semester';
+  }
+
+  // ---------- Admin login / logout (real Firebase Authentication) ----------
+  function renderAdminPanel(){
+    const panel = el('adminPanel');
+    panel.innerHTML = '';
+
+    if (!authRef) {
+      const note = document.createElement('div');
+      note.className = 'admin-note';
+      note.textContent = 'Admin login needs Firebase configured (see banner above).';
+      panel.appendChild(note);
+      return;
+    }
+
+    const status = document.createElement('div');
+    status.className = 'admin-status' + (isAdmin ? ' on' : '');
+    status.innerHTML = `<span class="dot"></span><span></span>`;
+    status.querySelector('span:last-child').textContent = isAdmin ? `Logged in as ${currentAdminName}` : 'Viewing as guest (locked)';
+    panel.appendChild(status);
+
+    if (!isAdmin) {
+      if (!showAdminLogin) {
+        const btn = document.createElement('button');
+        btn.className = 'link-btn';
+        btn.textContent = 'Admin log in';
+        btn.addEventListener('click', () => { showAdminLogin = true; adminLoginError = ''; renderAdminPanel(); focusSoon('[data-role="admin-email"]'); });
+        panel.appendChild(btn);
+      } else {
+        const form = document.createElement('form');
+        form.className = 'admin-form';
+        form.innerHTML = `
+          <input type="email" data-role="admin-email" placeholder="Admin email" autocomplete="username" />
+          <input type="password" data-role="admin-password" placeholder="Password" autocomplete="current-password" />
+          <div class="admin-form-actions">
+            <button type="submit">Log in</button>
+            <button type="button" data-role="cancel">Cancel</button>
+          </div>
+          <button type="button" class="link-btn" data-role="forgot" style="text-align:left;padding:0;">Forgot password?</button>
+          ${adminLoginError ? `<div class="admin-error">${adminLoginError}</div>` : ''}
+          ${resetSentMsg ? `<div class="admin-note">${resetSentMsg}</div>` : ''}
+        `;
+        form.querySelector('[data-role="cancel"]').addEventListener('click', () => {
+          showAdminLogin = false; adminLoginError = ''; resetSentMsg = ''; renderAdminPanel();
+        });
+        form.querySelector('[data-role="forgot"]').addEventListener('click', async () => {
+          const email = form.querySelector('[data-role="admin-email"]').value.trim();
+          if (!email) { adminLoginError = 'Enter your email above first.'; renderAdminPanel(); focusSoon('[data-role="admin-email"]'); return; }
+          try {
+            await authRef.sendPasswordResetEmail(email);
+          } catch (err) {
+            // Intentionally don't reveal whether the address has an account.
+          }
+          resetSentMsg = 'If that address has an admin account, a reset email is on its way.';
+          adminLoginError = '';
+          renderAdminPanel();
+        });
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const email = form.querySelector('[data-role="admin-email"]').value.trim();
+          const pass = form.querySelector('[data-role="admin-password"]').value;
+          adminLoginError = ''; resetSentMsg = '';
+          try {
+            await authRef.signInWithEmailAndPassword(email, pass);
+            showAdminLogin = false;
+            // onAuthStateChanged flips isAdmin and re-renders
+          } catch (err) {
+            adminLoginError = 'Incorrect email or password.';
+            renderAdminPanel();
+            focusSoon('[data-role="admin-email"]');
+          }
+        });
+        panel.appendChild(form);
+      }
+      return;
+    }
+
+    // Logged in as admin
+    const row = document.createElement('div');
+    row.className = 'admin-actions-row';
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'link-btn';
+    logoutBtn.textContent = 'Log out';
+    logoutBtn.addEventListener('click', async () => {
+      closeNoticeForm(); closeCourseForm();
+      editingMaterialId = null; expandedCourseId = null;
+      await authRef.signOut();
+      // onAuthStateChanged flips isAdmin and re-renders
+    });
+    row.appendChild(logoutBtn);
+    panel.appendChild(row);
+
+    const hint = document.createElement('div');
+    hint.className = 'admin-note';
+    hint.textContent = 'To add or remove admins, use the Firebase console → Authentication.';
+    panel.appendChild(hint);
+  }
+
+  function applyAdminVisibility(){
+    el('headerActions').style.display = isAdmin ? 'flex' : 'none';
+    el('addSemesterForm').style.display = isAdmin ? 'flex' : 'none';
+    el('newNoticeBtn').style.display = isAdmin ? 'inline-block' : 'none';
+    el('newCourseBtn').style.display = isAdmin ? 'inline-block' : 'none';
+  }
+
+  function focusSoon(selector){
+    setTimeout(() => {
+      const input = document.querySelector(selector);
+      if (input) input.focus();
+    }, 0);
+  }
+
+  // ---------- Notices ----------
+  function matchesNoticeFilters(notice){
+    const q = el('searchInput').value.trim().toLowerCase();
+    const cat = el('categoryFilter').value;
+    if (cat && notice.category !== cat) return false;
+    if (q && !(notice.title.toLowerCase().includes(q) || notice.description.toLowerCase().includes(q))) return false;
+    return true;
+  }
+
+  function fmtDate(iso){
+    if (!iso) return 'No date set';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function renderNoticeList(){
+    const sem = activeSemester();
+    const all = noticesFor(sem.id);
+    const filtered = all.filter(matchesNoticeFilters);
+    const sorted = [...filtered].sort((a,b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      const da = a.date || '9999-99-99', db = b.date || '9999-99-99';
+      return da.localeCompare(db);
+    });
+
+    const listEl = el('noticeList');
+    listEl.innerHTML = '';
+    el('noticeEmptyState').classList.toggle('hidden', all.length !== 0);
+
+    if (all.length === 0) { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'flex';
+
+    if (sorted.length === 0) {
+      const noMatch = document.createElement('div');
+      noMatch.className = 'empty-state';
+      noMatch.innerHTML = '<strong>No matches</strong>Try a different search term or category.';
+      listEl.appendChild(noMatch);
+      return;
+    }
+    sorted.forEach(notice => listEl.appendChild(renderNoticeCard(notice)));
+  }
+
+  function renderNoticeCard(notice){
+    const card = document.createElement('div');
+    card.className = 'notice-card cat-' + notice.category;
+    const main = document.createElement('div');
+    main.className = 'notice-main';
+    main.innerHTML = `
+      <div class="notice-meta-row">
+        <span class="tag-sm">${notice.category}</span>
+        ${notice.pinned ? '<span class="pinned-tag">Pinned</span>' : ''}
+      </div>
+      <p class="notice-title"></p>
+      <p class="notice-desc"></p>
+      <div class="notice-dates">Concerns: ${fmtDate(notice.date)}</div>
+    `;
+    main.querySelector('.notice-title').textContent = notice.title;
+    main.querySelector('.notice-desc').textContent = notice.description || '';
+
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+
+    if (!isAdmin) {
+      // guests get no edit controls on notices
+    } else if (confirmingDeleteNoticeId === notice.id) {
+      const row = document.createElement('div');
+      row.className = 'confirm-row';
+      const yes = document.createElement('button');
+      yes.className = 'yes'; yes.textContent = 'Delete';
+      yes.addEventListener('click', async () => {
+        const sem = activeSemester();
+        data.notices[sem.id] = noticesFor(sem.id).filter(n => n.id !== notice.id);
+        confirmingDeleteNoticeId = null;
+        await persist(); renderAll();
+      });
+      const no = document.createElement('button');
+      no.textContent = 'Cancel';
+      no.addEventListener('click', () => { confirmingDeleteNoticeId = null; renderAll(); });
+      row.appendChild(yes); row.appendChild(no);
+      actions.appendChild(row);
+    } else {
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => openNoticeForm(notice));
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => { confirmingDeleteNoticeId = notice.id; renderAll(); });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+    }
+    card.appendChild(main); card.appendChild(actions);
+    return card;
+  }
+
+  function openNoticeForm(notice){
+    editingNoticeId = notice ? notice.id : null;
+    el('noticeFormTitle').textContent = notice ? 'Edit notice' : 'New notice';
+    el('fTitle').value = notice ? notice.title : '';
+    el('fCategory').value = notice ? notice.category : 'General';
+    el('fDate').value = notice ? (notice.date || '') : '';
+    el('fDesc').value = notice ? notice.description : '';
+    el('fPinned').checked = notice ? !!notice.pinned : false;
+    el('noticeForm').classList.remove('hidden');
+    el('fTitle').focus();
+  }
+  function closeNoticeForm(){
+    editingNoticeId = null;
+    el('noticeForm').classList.add('hidden');
+    el('noticeForm').reset();
+  }
+  async function handleNoticeSubmit(e){
+    e.preventDefault();
+    const sem = activeSemester();
+    const title = el('fTitle').value.trim();
+    if (!title) { el('fTitle').focus(); return; }
+    const payload = {
+      title, category: el('fCategory').value, date: el('fDate').value,
+      description: el('fDesc').value.trim(), pinned: el('fPinned').checked
+    };
+    const list = noticesFor(sem.id);
+    if (editingNoticeId) {
+      const idx = list.findIndex(n => n.id === editingNoticeId);
+      if (idx !== -1) list[idx] = { ...list[idx], ...payload };
+    } else {
+      list.push({ id: uid(), createdAt: Date.now(), ...payload });
+    }
+    await persist(); closeNoticeForm(); renderAll();
+  }
+
+  // ---------- Courses ----------
+  function matchesCourseFilters(c){
+    const q = el('courseSearchInput').value.trim().toLowerCase();
+    const type = el('typeFilter').value;
+    if (type && c.type !== type) return false;
+    if (q && !(c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q))) return false;
+    return true;
+  }
+
+  function renderCreditSummary(){
+    const sem = activeSemester();
+    const list = coursesFor(sem.id);
+    const total = list.reduce((sum, c) => sum + (Number(c.credit) || 0), 0);
+    el('creditSummary').textContent = `${list.length} course${list.length === 1 ? '' : 's'} · ${total} credit hour${total === 1 ? '' : 's'} listed for this semester`;
+  }
+
+  function renderCourseList(){
+    const sem = activeSemester();
+    const all = coursesFor(sem.id);
+    const filtered = all.filter(matchesCourseFilters);
+
+    const listEl = el('courseList');
+    listEl.innerHTML = '';
+    el('courseEmptyState').classList.toggle('hidden', all.length !== 0);
+    renderCreditSummary();
+
+    if (all.length === 0) { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'flex';
+
+    if (filtered.length === 0) {
+      const noMatch = document.createElement('div');
+      noMatch.className = 'empty-state';
+      noMatch.innerHTML = '<strong>No matches</strong>Try a different search term or type.';
+      listEl.appendChild(noMatch);
+      return;
+    }
+    filtered.forEach(c => listEl.appendChild(renderCourseBlock(c)));
+  }
+
+  function renderCourseBlock(c){
+    const wrap = document.createElement('div');
+    wrap.className = 'course-block';
+
+    const isExpanded = expandedCourseId === c.id;
+    const card = document.createElement('div');
+    card.className = 'course-card type-' + c.type + (isExpanded ? ' expanded' : '');
+    const main = document.createElement('div');
+    main.className = 'course-main';
+    main.innerHTML = `
+      <div class="course-code"></div>
+      <div class="course-title"></div>
+      <div class="course-meta">
+        <span class="type-tag ${c.type}">${c.type}</span>
+        <span class="credit-tag">${c.credit} credit${Number(c.credit) === 1 ? '' : 's'}</span>
+        ${c.elective ? '<span class="elective-tag">Elective</span>' : ''}
+      </div>
+    `;
+    main.querySelector('.course-code').textContent = c.code;
+    main.querySelector('.course-title').textContent = c.title;
+
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+
+    if (isAdmin && confirmingDeleteCourseId === c.id) {
+      const row = document.createElement('div');
+      row.className = 'confirm-row';
+      const yes = document.createElement('button');
+      yes.className = 'yes'; yes.textContent = 'Delete';
+      yes.addEventListener('click', async () => {
+        const sem = activeSemester();
+        data.courses[sem.id] = coursesFor(sem.id).filter(x => x.id !== c.id);
+        delete data.materials[c.id];
+        confirmingDeleteCourseId = null;
+        if (expandedCourseId === c.id) expandedCourseId = null;
+        await persist(); renderAll();
+      });
+      const no = document.createElement('button');
+      no.textContent = 'Cancel';
+      no.addEventListener('click', () => { confirmingDeleteCourseId = null; renderAll(); });
+      row.appendChild(yes); row.appendChild(no);
+      actions.appendChild(row);
+    } else {
+      const matCount = materialsFor(c.id).length;
+      const matBtn = document.createElement('button');
+      matBtn.className = 'materials-btn' + (isExpanded ? ' active' : '');
+      matBtn.textContent = 'Materials' + (matCount ? ` (${matCount})` : '');
+      matBtn.addEventListener('click', () => {
+        expandedCourseId = isExpanded ? null : c.id;
+        editingMaterialId = null; confirmingDeleteMaterialId = null;
+        renderAll();
+      });
+      actions.appendChild(matBtn);
+      if (isAdmin) {
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openCourseForm(c));
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => { confirmingDeleteCourseId = c.id; renderAll(); });
+        actions.appendChild(editBtn); actions.appendChild(delBtn);
+      }
+    }
+    card.appendChild(main); card.appendChild(actions);
+    wrap.appendChild(card);
+
+    if (isExpanded) {
+      wrap.appendChild(renderMaterialsPanel(c));
+    }
+    return wrap;
+  }
+
+  function openCourseForm(c){
+    editingCourseId = c ? c.id : null;
+    el('courseFormTitle').textContent = c ? 'Edit course' : 'New course';
+    el('cCode').value = c ? c.code : '';
+    el('cTitle').value = c ? c.title : '';
+    el('cType').value = c ? c.type : 'Theory';
+    el('cCredit').value = c ? c.credit : 3;
+    el('cElective').checked = c ? !!c.elective : false;
+    el('courseForm').classList.remove('hidden');
+    el('cCode').focus();
+  }
+  function closeCourseForm(){
+    editingCourseId = null;
+    el('courseForm').classList.add('hidden');
+    el('courseForm').reset();
+  }
+  async function handleCourseSubmit(e){
+    e.preventDefault();
+    const sem = activeSemester();
+    const code = el('cCode').value.trim();
+    const title = el('cTitle').value.trim();
+    if (!code || !title) { (code ? el('cTitle') : el('cCode')).focus(); return; }
+    const payload = {
+      code, title, type: el('cType').value,
+      credit: parseFloat(el('cCredit').value) || 0,
+      elective: el('cElective').checked
+    };
+    const list = coursesFor(sem.id);
+    if (editingCourseId) {
+      const idx = list.findIndex(c => c.id === editingCourseId);
+      if (idx !== -1) list[idx] = { ...list[idx], ...payload };
+    } else {
+      list.push({ id: uid(), ...payload });
+    }
+    await persist(); closeCourseForm(); renderAll();
+  }
+
+  // ---------- Materials (CT / Mid / Semester Final) ----------
+  function renderMaterialsPanel(courseObj){
+    const panel = document.createElement('div');
+    panel.className = 'materials-panel';
+
+    const all = materialsFor(courseObj.id);
+
+    STAGES.forEach(stage => {
+      const section = document.createElement('div');
+      section.className = 'stage-section';
+
+      const header = document.createElement('div');
+      header.className = 'stage-header';
+      const h4 = document.createElement('h4');
+      h4.textContent = stage.label;
+      header.appendChild(h4);
+      if (isAdmin) {
+        const addBtn = document.createElement('button');
+        addBtn.textContent = '+ Add';
+        addBtn.addEventListener('click', () => openMaterialForm(courseObj.id, stage.key, null));
+        header.appendChild(addBtn);
+      }
+      section.appendChild(header);
+
+      if (isAdmin && editingMaterialId === 'NEW' && materialFormStage === stage.key && expandedCourseId === courseObj.id) {
+        section.appendChild(buildMaterialForm(courseObj.id, stage.key, null));
+      }
+
+      const items = all.filter(m => m.stage === stage.key);
+      if (items.length === 0 && !(isAdmin && editingMaterialId === 'NEW' && materialFormStage === stage.key)) {
+        const empty = document.createElement('div');
+        empty.className = 'stage-empty';
+        empty.textContent = 'Nothing filed here yet.';
+        section.appendChild(empty);
+      } else {
+        const list = document.createElement('div');
+        list.className = 'material-list';
+        items.forEach(m => {
+          if (isAdmin && editingMaterialId === m.id) {
+            list.appendChild(buildMaterialForm(courseObj.id, stage.key, m));
+          } else {
+            list.appendChild(renderMaterialItem(courseObj.id, m));
+          }
+        });
+        section.appendChild(list);
+      }
+      panel.appendChild(section);
+    });
+
+    return panel;
+  }
+
+  function renderMaterialItem(courseId, m){
+    const row = document.createElement('div');
+    row.className = 'material-item type-' + m.type;
+
+    const main = document.createElement('div');
+    main.className = 'material-main';
+    const typeTag = document.createElement('span');
+    typeTag.className = 'material-type-tag ' + m.type;
+    typeTag.textContent = m.type;
+    const title = document.createElement('span');
+    title.className = 'material-title';
+    title.textContent = m.title;
+    main.appendChild(typeTag); main.appendChild(title);
+    if (m.link) {
+      const a = document.createElement('a');
+      a.className = 'material-link';
+      a.href = m.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = 'Open ↗';
+      main.appendChild(a);
+    }
+    if (m.notes) {
+      const notes = document.createElement('span');
+      notes.className = 'material-notes';
+      notes.textContent = m.notes;
+      main.appendChild(notes);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'material-actions';
+    if (!isAdmin) {
+      // guests: view only, no edit/delete controls
+    } else if (confirmingDeleteMaterialId === m.id) {
+      const yes = document.createElement('button');
+      yes.className = 'yes'; yes.textContent = 'Delete';
+      yes.addEventListener('click', async () => {
+        data.materials[courseId] = materialsFor(courseId).filter(x => x.id !== m.id);
+        confirmingDeleteMaterialId = null;
+        await persist(); renderAll();
+      });
+      const no = document.createElement('button');
+      no.textContent = 'Cancel';
+      no.addEventListener('click', () => { confirmingDeleteMaterialId = null; renderAll(); });
+      actions.appendChild(yes); actions.appendChild(no);
+    } else {
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => openMaterialForm(courseId, m.stage, m));
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => { confirmingDeleteMaterialId = m.id; renderAll(); });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+    }
+
+    row.appendChild(main); row.appendChild(actions);
+    return row;
+  }
+
+  function openMaterialForm(courseId, stage, material){
+    expandedCourseId = courseId;
+    materialFormStage = stage;
+    editingMaterialId = material ? material.id : 'NEW';
+    renderAll();
+    setTimeout(() => {
+      const input = document.querySelector('.materials-panel input[data-role="mat-title"]');
+      if (input) input.focus();
+    }, 0);
+  }
+
+  function buildMaterialForm(courseId, stage, material){
+    const form = document.createElement('form');
+    form.className = 'panel-form';
+    form.style.marginBottom = '10px';
+    form.innerHTML = `
+      <h3>${material ? 'Edit material' : 'Add material'} — ${STAGES.find(s => s.key === stage).label}</h3>
+      <div class="form-row">
+        <div class="form-field" style="flex:2;">
+          <label>Title</label>
+          <input type="text" data-role="mat-title" maxlength="120" placeholder="e.g. CT-1 handwritten note" required />
+        </div>
+        <div class="form-field">
+          <label>Type</label>
+          <select data-role="mat-type">
+            ${MATERIAL_TYPES.map(t => `<option ${material && material.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Link (optional)</label>
+        <input type="url" data-role="mat-link" placeholder="Drive / OneDrive / other share link" />
+        <div class="form-hint">This board can't store actual files — paste a link to where the note or PDF lives.</div>
+      </div>
+      <div class="form-field">
+        <label>Notes (optional)</label>
+        <textarea data-role="mat-notes" maxlength="300" placeholder="e.g. covers chapters 3–4, scanned copy"></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="cancel">Cancel</button>
+        <button type="submit" class="save">Save material</button>
+      </div>
+    `;
+    form.querySelector('[data-role="mat-title"]').value = material ? material.title : '';
+    form.querySelector('[data-role="mat-link"]').value = material ? (material.link || '') : '';
+    form.querySelector('[data-role="mat-notes"]').value = material ? (material.notes || '') : '';
+
+    form.querySelector('.cancel').addEventListener('click', () => {
+      editingMaterialId = null; renderAll();
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = form.querySelector('[data-role="mat-title"]').value.trim();
+      if (!title) { form.querySelector('[data-role="mat-title"]').focus(); return; }
+      const payload = {
+        title,
+        type: form.querySelector('[data-role="mat-type"]').value,
+        stage,
+        link: form.querySelector('[data-role="mat-link"]').value.trim(),
+        notes: form.querySelector('[data-role="mat-notes"]').value.trim()
+      };
+      const list = materialsFor(courseId);
+      if (material) {
+        const idx = list.findIndex(m => m.id === material.id);
+        if (idx !== -1) list[idx] = { ...list[idx], ...payload };
+      } else {
+        list.push({ id: uid(), createdAt: Date.now(), ...payload });
+      }
+      editingMaterialId = null;
+      await persist(); renderAll();
+    });
+    return form;
+  }
+
+  // ---------- Semester actions ----------
+  async function handleAddSemester(e){
+    e.preventDefault();
+    const input = el('newSemesterInput');
+    const name = input.value.trim();
+    if (!name) return;
+    const newSem = { id: uid(), name, createdAt: Date.now() };
+    data.semesters.push(newSem);
+    data.notices[newSem.id] = [];
+    data.courses[newSem.id] = [];
+    data.activeSemesterId = newSem.id;
+    input.value = '';
+    await persist(); renderAll();
+  }
+
+  function handleRenameSemester(){
+    const sem = activeSemester();
+    const name = prompt('Rename semester', sem.name);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    sem.name = trimmed;
+    persist().then(renderAll);
+  }
+
+  function handleDeleteSemester(){
+    if (data.semesters.length <= 1) {
+      alert('At least one semester needs to stay on the board. Add another semester before deleting this one.');
+      return;
+    }
+    if (!confirmingSemesterDelete) {
+      confirmingSemesterDelete = true;
+      renderDeleteSemesterButton();
+      setTimeout(() => { confirmingSemesterDelete = false; renderDeleteSemesterButton(); }, 3000);
+      return;
+    }
+    const sem = activeSemester();
+    const removedCourses = coursesFor(sem.id);
+    removedCourses.forEach(c => delete data.materials[c.id]);
+    data.semesters = data.semesters.filter(s => s.id !== sem.id);
+    delete data.notices[sem.id];
+    delete data.courses[sem.id];
+    data.activeSemesterId = data.semesters[0].id;
+    confirmingSemesterDelete = false;
+    expandedCourseId = null;
+    persist().then(renderAll);
+  }
+
+  // ---------- Tabs ----------
+  function switchTab(tab){
+    activeTab = tab;
+    el('tabNotices').classList.toggle('active', tab === 'notices');
+    el('tabCourses').classList.toggle('active', tab === 'courses');
+    el('noticesPanel').style.display = tab === 'notices' ? 'block' : 'none';
+    el('coursesPanel').style.display = tab === 'courses' ? 'block' : 'none';
+  }
+
+  function renderAll(){
+    renderAdminPanel();
+    applyAdminVisibility();
+    renderSemesterList();
+    renderHeader();
+    renderDeleteSemesterButton();
+    renderNoticeList();
+    renderCourseList();
+  }
+
+  // ---------- Wire up ----------
+  function attachEvents(){
+    el('addSemesterForm').addEventListener('submit', handleAddSemester);
+    el('renameSemBtn').addEventListener('click', handleRenameSemester);
+    el('deleteSemBtn').addEventListener('click', handleDeleteSemester);
+
+    el('tabNotices').addEventListener('click', () => switchTab('notices'));
+    el('tabCourses').addEventListener('click', () => switchTab('courses'));
+
+    el('newNoticeBtn').addEventListener('click', () => openNoticeForm(null));
+    el('cancelNoticeBtn').addEventListener('click', closeNoticeForm);
+    el('noticeForm').addEventListener('submit', handleNoticeSubmit);
+    el('searchInput').addEventListener('input', renderNoticeList);
+    el('categoryFilter').addEventListener('change', renderNoticeList);
+
+    el('newCourseBtn').addEventListener('click', () => openCourseForm(null));
+    el('cancelCourseBtn').addEventListener('click', closeCourseForm);
+    el('courseForm').addEventListener('submit', handleCourseSubmit);
+    el('courseSearchInput').addEventListener('input', renderCourseList);
+    el('typeFilter').addEventListener('change', renderCourseList);
+  }
+
+  async function waitForAuthReady(){
+    if (!authRef) return;
+    if (authReady) return;
+    await new Promise(resolve => {
+      const unsub = authRef.onAuthStateChanged(() => { unsub(); resolve(); });
+    });
+  }
+
+  async function init(){
+    await Promise.all([loadData(), waitForAuthReady()]);
+    attachEvents();
+    switchTab('notices');
+    el('statusLine').style.display = 'none';
+    el('mainContent').style.display = 'block';
+    if (!dbRef) {
+      const warn = document.createElement('div');
+      warn.className = 'caveat';
+      warn.style.background = '#FBEFE9';
+      warn.style.border = '1px solid var(--maroon)';
+      warn.style.color = 'var(--maroon)';
+      warn.style.padding = '10px 14px';
+      warn.style.borderRadius = '3px';
+      warn.style.marginBottom = '16px';
+      warn.textContent = 'Firebase isn\u2019t configured yet, so this board is only saving to your own browser. Fill in FIREBASE_CONFIG near the top of the <script> tag with your Firebase project\u2019s details to make it shared across everyone who visits this site.';
+      el('mainContent').prepend(warn);
+    }
+    renderAll();
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>
